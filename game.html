@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>피하기게임</title>
+<style>
+canvas{
+  background-color:#CEECF5;
+  }
+</style>
+</head>
+<body>
+  <canvas id="ctx" height="600" width="800" style="border:1px solid #000000;"></canvas>
+  <script>
+  var ctx = document.getElementById("ctx").getContext("2d");
+  ctx.font = '30px Arial';
+
+  var HEIGHT = 600;
+  var WIDTH = 800;
+  var timeWhenGameStarted = Date.now();
+  var count=0;
+  var frameCount = 0;
+
+  var score = 0;
+//이미지 데이터 불러오는거
+  var Img = {};
+  Img.player = new Image();
+  Img.player.src = "img/player.png";
+  Img.enemy = new Image();
+  Img.enemy.src = "img/enemy.png";
+  Img.item = new Image();
+  Img.item.src = "img/item.png";
+  Img.destory = new Image();
+  Img.destory.src = "img/destory.png";
+  Img.size = new Image();
+  Img.size.src = "img/size.png";
+  Img.score = new Image();
+  Img.score.src = "img/score.png";
+
+//플레이어 속성
+  var player = {
+  	x:50,
+  	spdX:30,
+  	y:40,
+  	spdY:5,
+  	name:'P',
+  	hp:10,
+  	width:50,
+  	height:50,
+    img:Img.player,
+  };
+
+  var enemyList = {};
+  var itemList = {};
+  var destoryList = {};
+  var sizeList = {};
+  var scoreList = {};
+
+//거리체크
+  getDistanceBetweenEntity = function (entity1,entity2){
+  	var vx = entity1.x - entity2.x;
+  	var vy = entity1.y - entity2.y;
+  	return Math.sqrt(vx*vx+vy*vy);
+  }
+//충돌체크
+  testCollisionEntity = function (entity1,entity2){
+  	var rect1 = {
+  		x:entity1.x-entity1.width/2,
+  		y:entity1.y-entity1.height/2,
+  		width:entity1.width,
+  		height:entity1.height,
+  	}
+  	var rect2 = {
+  		x:entity2.x-entity2.width/2,
+  		y:entity2.y-entity2.height/2,
+  		width:entity2.width,
+  		height:entity2.height,
+  	}
+  	return testCollisionRectRect(rect1,rect2);
+
+  }
+
+//적에 관한 속성
+  Enemy = function (id,x,y,spdX,spdY,width,height,img){
+  	var enemy3 = {
+  		x:x,
+  		spdX:spdX,
+  		y:y,
+  		spdY:spdY,
+  		name:'E',
+  		id:id,
+  		width:width,
+  		height:height,
+      img:Img.enemy,
+  	};
+  	enemyList[id] = enemy3;
+
+  }
+//아이템에 관한 속성
+  Item = function (id,x,y,spdX,spdY,width,height,img){
+    var item = {
+      x:x,
+      spdX:spdX,
+      y:y,
+      spdY:spdY,
+      name:'I',
+      id:id,
+      width:width,
+      height:height,
+      img:Img.item,
+    };
+    itemList[id] = item;
+
+  }
+//파괴에 관한 속성
+  Destory= function (id,x,y,spdX,spdY,width,height,img){
+    var destory = {
+      x:x,
+      spdX:spdX,
+      y:y,
+      spdY:spdY,
+      name:'D',
+      id:id,
+      width:width,
+      height:height,
+      img:Img.destory,
+    };
+    destoryList[id] = destory;
+
+  }
+//사이즈에 관한 속성
+  Size= function (id,x,y,spdX,spdY,width,height,img){
+    var size = {
+      x:x,
+      spdX:spdX,
+      y:y,
+      spdY:spdY,
+      name:'Size',
+      id:id,
+      width:width,
+      height:height,
+      img:Img.size,
+      timer:0,
+    };
+    sizeList[id] = size;
+
+  }
+//점수에 관한 속성
+Score= function (id,x,y,spdX,spdY,width,height,img){
+  var score = {
+    x:x,
+    spdX:spdX,
+    y:y,
+    spdY:spdY,
+    name:'score',
+    id:id,
+    width:width,
+    height:height,
+    img:Img.score,
+    timer:0,
+  };
+  scoreList[id] = score;
+
+}
+
+//마우스로 이동하는거 구현
+  document.onmousemove = function(mouse){
+  	var mouseX = mouse.clientX - document.getElementById('ctx').getBoundingClientRect().left;
+  	var mouseY = mouse.clientY - document.getElementById('ctx').getBoundingClientRect().top;
+
+  	if(mouseX < player.width/2)
+  		mouseX = player.width/2;
+  	if(mouseX > WIDTH-player.width/2)
+  		mouseX = WIDTH - player.width/2;
+  	if(mouseY < player.height/2)
+  		mouseY = player.height/2;
+  	if(mouseY > HEIGHT - player.height/2)
+  		mouseY = HEIGHT - player.height/2;
+
+  	player.x = mouseX;
+  	player.y = mouseY;
+  }
+
+
+//적 추가하는거
+  updateEntity = function (something){
+  	updateEntityPosition(something);
+  	drawEntity(something);
+  }
+//객체 충돌
+  updateEntityPosition = function(something){
+  	something.x += something.spdX;
+  	something.y += something.spdY;
+
+  	if(something.x < 0 || something.x > WIDTH){
+  		something.spdX = -something.spdX;
+  	}
+  	if(something.y < 0 || something.y > HEIGHT){
+  		something.spdY = -something.spdY;
+  	}
+  }
+//어느물체의 방향으로든 충돌하는지 체크
+  testCollisionRectRect = function(rect1,rect2){
+  	return rect1.x <= rect2.x+rect2.width
+  		&& rect2.x <= rect1.x+rect1.width
+  		&& rect1.y <= rect2.y + rect2.height
+  		&& rect2.y <= rect1.y + rect1.height;
+  }
+
+//객체들 그리는거 함수
+  drawEntity = function(something){
+  	ctx.save();
+    var x = something.x-something.width/2;
+    var y = something.y-something.height/2;
+  	ctx.drawImage(something.img,0,0,something.img.width,
+    something.img.height,x,y,something.width,something.height);
+    ctx.fillStyle = something.color;
+  	ctx.restore();
+  }
+//게임진행되는동안 진행되는 것들
+  update = function(){
+  	ctx.clearRect(0,0,WIDTH,HEIGHT);
+  	frameCount++;
+    score++;
+
+  	if(frameCount % 100 === 0)//100점마다 생성
+  		randomlyGenerateEnemy();
+    if(frameCount % 75 === 0)//75점마다 생성
+      randomlyGenerateItem();
+    if(frameCount % 200 === 0)//200점마다 생성
+      randomlyGenerateDestory();
+    if(frameCount % 350 === 0)//350점마다 생성
+      randomlyGenerateSize();
+    if(frameCount % 300 === 0)//300점마다 생성
+      randomlyGenerateScore();
+//사이즈업 생성과 충돌시 이벤트
+    for(var key in sizeList){
+  		updateEntity(sizeList[key]);
+      var toRemove=false;
+      sizeList[key].timer++;
+      if(sizeList[key].timer>150){
+         toRemove=true;
+      }
+      var isColliding = testCollisionEntity(player,sizeList[key]);
+      if(isColliding){
+        player.width += 15;
+        player.height += 15;
+        toRemove=true;
+      }
+      if(toRemove){
+        delete sizeList[key];
+      }
+    }
+//점수아이템 생성과 충돌시 이벤트
+for(var key in scoreList){
+  updateEntity(scoreList[key]);
+  var toRemove=false;
+  scoreList[key].timer++;
+  if(scoreList[key].timer>150){
+     toRemove=true;
+  }
+  var isColliding = testCollisionEntity(player,scoreList[key]);
+  if(isColliding){
+    score +=100;
+    toRemove=true;
+  }
+  if(toRemove){
+    delete scoreList[key];
+  }
+}
+//파괴아이템 생성과 충돌시 이벤트
+for(var key in destoryList){
+  updateEntity(destoryList[key]);
+
+  var isColliding = testCollisionEntity(player,destoryList[key]);
+  if(isColliding){
+      for(var key2 in enemyList){
+            var isColliding = testCollisionEntity(player,enemyList[key2]);
+                    delete enemyList[key2];
+                    break;
+      }
+    delete destoryList[key];
+  }
+
+}
+//아이템 생성과 충돌시 이벤트
+    for(var key in itemList){
+  		updateEntity(itemList[key]);
+
+      var isColliding = testCollisionEntity(player,itemList[key]);
+      if(isColliding){
+        player.hp = player.hp + 1;
+        delete itemList[key];
+      }
+    }
+//적 생성과 충돌시 이벤트
+  	for(var key in enemyList){
+  		updateEntity(enemyList[key]);
+
+  		var isColliding = testCollisionEntity(player,enemyList[key]);
+  		if(isColliding){
+  			player.hp = player.hp - 1;
+  		}
+  	}
+
+  	if(player.hp <= 0){
+  		var timeSurvived = Date.now() - timeWhenGameStarted;
+  		alert("아쉽네요..풉ㅋ\n" + timeSurvived + " ms 동안 살아남음\n " + score +"점수 ");
+  		startNewGame();
+  	}
+
+//플레이어 생성 및 체력과 점수
+  	drawEntity(player);
+  	ctx.fillText(player.hp + " 체력",0,30);
+    ctx.fillText('점수:' + score ,200,30);
+
+  }
+//게임 새로 만드는 함수
+  startNewGame = function(){
+  	player.hp = 10;
+  	timeWhenGameStarted = Date.now();
+  	frameCount = 0;
+    score = 0;
+    count = 0;
+  	enemyList = {};
+    itemList={};
+    destoryList={};
+    sizeList={};
+    scoreList={};
+    player.width = 50;
+    player.height = 50;
+    randomlyGenerateEnemy();
+  }
+//적 랜덤으로 생성하는 함수
+  randomlyGenerateEnemy = function(){
+  	//Math.random() returns a number between 0 and 1
+  	var x = Math.random()*WIDTH;
+  	var y = Math.random()*HEIGHT;
+  	var height = 64;
+  	var width = 64;
+  	var id = Math.random();
+  	var spdX = 5 + Math.random() * 5;
+  	var spdY = 5 + Math.random() * 5;
+  	Enemy(id,x,y,spdX,spdY,width,height);
+  }
+//아이템 랜덤으로 생성하는 함수
+  randomlyGenerateItem = function(){
+    //Math.random() returns a number between 0 and 1
+    var x = Math.random()*WIDTH;
+    var y = Math.random()*HEIGHT;
+    var height = 30;
+    var width = 30;
+    var id = Math.random();
+    var spdX = 0;
+    var spdY = 0;
+    Item(id,x,y,spdX,spdY,width,height);
+  }
+//제거 랜덤으로 생성하는 함수
+  randomlyGenerateDestory = function(){
+    //Math.random() returns a number between 0 and 1
+    var x = Math.random()*WIDTH;
+    var y = Math.random()*HEIGHT;
+    var height = 30;
+    var width = 30;
+    var id = Math.random();
+    var spdX = 15;
+    var spdY = 15;
+    Destory(id,x,y,spdX,spdY,width,height);
+  }
+//스피드 랜덤으로 생성하는 함수
+  randomlyGenerateSize = function(){
+    //Math.random() returns a number between 0 and 1
+    var x = Math.random()*WIDTH;
+    var y = Math.random()*HEIGHT;
+    var height = 30;
+    var width = 30;
+    var id = Math.random();
+    var spdX = 5;
+    var spdY = 5;
+    Size(id,x,y,spdX,spdY,width,height);
+  }
+//점수 랜덤으로 생성하는 함수
+  randomlyGenerateScore = function(){
+    //Math.random() returns a number between 0 and 1
+    var x = Math.random()*WIDTH;
+    var y = Math.random()*HEIGHT;
+    var height = 30;
+    var width = 30;
+    var id = Math.random();
+    var spdX = 10;
+    var spdY = 10;
+    Score(id,x,y,spdX,spdY,width,height);
+  }
+
+  startNewGame();
+
+  setInterval(update,40);
+  </script>
+</body>
+</html>
